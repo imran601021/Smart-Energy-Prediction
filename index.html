@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EnergyIQ — Smart Energy Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0e17;
+    --bg2:       #111827;
+    --bg3:       #1a2235;
+    --card:      #141c2e;
+    --border:    rgba(255,255,255,0.07);
+    --accent:    #00e5ff;
+    --accent2:   #7c3aed;
+    --green:     #10b981;
+    --amber:     #f59e0b;
+    --red:       #ef4444;
+    --text:      #f1f5f9;
+    --muted:     #64748b;
+    --mono:      'Space Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .page { display: none; min-height: 100vh; position: relative; z-index: 1; }
+  .page.active { display: flex; }
+
+  /* ── LOGIN ── */
+  #page-login { align-items: center; justify-content: center; padding: 24px; }
+  .login-box {
+    width: 100%; max-width: 420px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 48px 40px;
+    position: relative; overflow: hidden;
+  }
+  .login-box::before {
+    content: ''; position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+    width: 240px; height: 240px;
+    background: radial-gradient(circle, rgba(0,229,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .login-logo { text-align: center; margin-bottom: 36px; }
+  .login-logo .icon {
+    width: 56px; height: 56px; margin: 0 auto 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 26px;
+  }
+  .login-logo h1 { font-family: var(--mono); font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  .login-logo p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .field input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: 13px 16px;
+    color: var(--text); font-family: var(--sans); font-size: 15px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .btn-login {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, var(--accent), #0891b2);
+    border: none; border-radius: 10px;
+    color: #000; font-family: var(--sans); font-size: 15px; font-weight: 600;
+    cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-login:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-login:active { transform: translateY(0); }
+  .login-error {
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5; border-radius: 8px; padding: 10px 14px;
+    font-size: 13px; margin-top: 14px; display: none; text-align: center;
+  }
+  .demo-hint { text-align: center; margin-top: 20px; font-size: 12px; color: var(--muted); }
+  .demo-hint span { color: var(--accent); font-family: var(--mono); }
+
+  /* ── LAYOUT ── */
+  #page-dashboard, #page-predict { flex-direction: column; }
+
+  /* ── NAV ── */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px;
+    background: rgba(10,14,23,0.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-brand {
+    font-family: var(--mono); font-size: 16px; font-weight: 700;
+    color: var(--accent); letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .nav-brand .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 8px 18px; border-radius: 8px; border: none;
+    background: transparent; color: var(--muted);
+    font-family: var(--sans); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--bg3); }
+  .nav-tab.active { background: var(--bg3); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-time { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .btn-logout {
+    padding: 7px 14px; border-radius: 8px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); font-size: 13px; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── CONTENT ── */
+  .page-content { flex: 1; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+  /* ── STAT CARDS ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px 24px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-card:hover { border-color: rgba(0,229,255,0.2); transform: translateY(-2px); }
+  .stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent); opacity: 0.4;
+  }
+  .stat-label { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-unit  { font-size: 13px; color: var(--muted); font-family: var(--sans); font-weight: 400; margin-left: 4px; }
+  .stat-sub   { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .stat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; margin-top: 6px; }
+  .badge-green { background: rgba(16,185,129,0.15);  color: var(--green); }
+  .badge-amber { background: rgba(245,158,11,0.15);  color: var(--amber); }
+  .badge-red   { background: rgba(239,68,68,0.15);   color: var(--red); }
+  .badge-blue  { background: rgba(0,229,255,0.12);   color: var(--accent); }
+
+  /* ── CHARTS ── */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+  .chart-sub   { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+  .chart-wrap  { position: relative; height: 220px; }
+
+  /* ── ANOMALY ── */
+  .anomaly-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 28px; }
+  .anomaly-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .anomaly-title  { font-size: 14px; font-weight: 600; color: var(--text); }
+  .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .pill-ok    { background: rgba(16,185,129,0.15); color: var(--green); }
+  .pill-alert { background: rgba(239,68,68,0.15);  color: var(--red); }
+  .pill-dot   { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; font-weight: 500; color: var(--muted); text-align: left; padding: 0 12px 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+  td { padding: 12px; font-size: 13px; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .td-mono { font-family: var(--mono); font-size: 13px; }
+
+  /* ── REFRESH ROW ── */
+  .refresh-row { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .btn-refresh {
+    padding: 9px 20px; border-radius: 9px;
+    background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.25);
+    color: var(--accent); font-family: var(--sans); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-refresh:hover { background: rgba(0,229,255,0.18); }
+  .refresh-status { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  .auto-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent; font-family: var(--sans); font-size: 13px; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .auto-toggle.on  { border-color: rgba(16,185,129,0.4); color: var(--green); background: rgba(16,185,129,0.08); }
+  .auto-toggle.off { border-color: var(--border); color: var(--muted); }
+  .auto-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .auto-dot.blinking { animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .countdown-wrap { display: flex; align-items: center; gap: 6px; }
+  .countdown-ring { width: 28px; height: 28px; }
+  .countdown-ring circle { fill: none; stroke-width: 3; }
+  .ring-bg   { stroke: rgba(255,255,255,0.08); }
+  .ring-fill { stroke: var(--green); stroke-linecap: round; transform-origin: center; transform: rotate(-90deg); transition: stroke-dashoffset 1s linear; }
+  .countdown-num { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 20px; }
+
+  .spinning { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── PREDICT PAGE ── */
+  .predict-header { margin-bottom: 28px; }
+  .predict-header h2 { font-size: 22px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .predict-header p  { font-size: 14px; color: var(--muted); }
+  .btn-predict {
+    padding: 13px 32px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent2), #6d28d9);
+    border: none; color: #fff;
+    font-family: var(--sans); font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .btn-predict:hover { opacity: 0.9; transform: translateY(-2px); }
+  .btn-predict:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .predict-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin: 28px 0; }
+  .forecast-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+  .forecast-title { font-size: 14px; font-weight: 600; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .forecast-chart-wrap { position: relative; height: 300px; }
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .cost-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+  .cost-card h4 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+  .cost-big  { font-family: var(--mono); font-size: 36px; font-weight: 700; color: var(--accent); }
+  .cost-unit { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state .big { font-size: 48px; margin-bottom: 16px; }
+  .empty-state p { font-size: 14px; }
+
+  .loading-bar {
+    position: fixed; top: 0; left: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s; z-index: 9999; width: 0%;
+  }
+
+  @media (max-width: 768px) {
+    .charts-row { grid-template-columns: 1fr; }
+    .predict-cards { grid-template-columns: repeat(2,1fr); }
+    .cost-grid { grid-template-columns: 1fr; }
+    .page-content { padding: 16px; }
+    .nav { padding: 12px 16px; }
+    .nav-time { display: none; }
+    .countdown-wrap { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- ══ PAGE 1 — LOGIN ══ -->
+<div class="page active" id="page-login">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">⚡</div>
+      <h1>EnergyIQ</h1>
+      <p>Smart Home Energy Monitor</p>
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="admin" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Sign In →</button>
+    <div class="login-error" id="login-error">Invalid credentials. Try again.</div>
+    <div class="demo-hint">Demo: <span>admin</span> / <span>energy123</span></div>
+  </div>
+</div>
+
+<!-- ══ PAGE 2 — DASHBOARD ══ -->
+<div class="page" id="page-dashboard">
+  <nav class="nav">
+    <div class="nav-brand"><span>⚡ EnergyIQ</span><div class="dot"></div></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="showPage('predict')">Prediction</button>
+    </div>
+    <div class="nav-right">
+      <span class="nav-time" id="nav-clock">--:--:--</span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="page-content">
+
+    <div class="refresh-row">
+      <button class="btn-refresh" onclick="loadDashboard()">⟳ &nbsp;Refresh</button>
+      <button class="auto-toggle off" id="auto-btn" onclick="toggleAutoRefresh()">
+        <div class="auto-dot" id="auto-dot"></div>
+        <span id="auto-label">Auto-refresh: OFF</span>
+      </button>
+      <div class="countdown-wrap" id="countdown-wrap" style="display:none">
+        <svg class="countdown-ring" viewBox="0 0 28 28">
+          <circle class="ring-bg" cx="14" cy="14" r="11"/>
+          <circle class="ring-fill" id="ring-fill" cx="14" cy="14" r="11"
+            stroke-dasharray="69.1" stroke-dashoffset="0"/>
+        </svg>
+        <span class="countdown-num" id="countdown-num">10s</span>
+      </div>
+      <span class="refresh-status" id="dash-status">Press Refresh or turn on Auto-refresh</span>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Power Now</div><div class="stat-value" id="s-power">--<span class="stat-unit">W</span></div><div class="stat-sub" id="s-power-sub">--</div></div>
+      <div class="stat-card"><div class="stat-label">Voltage</div><div class="stat-value" id="s-volt">--<span class="stat-unit">V</span></div><div class="stat-sub">AC RMS</div></div>
+      <div class="stat-card"><div class="stat-label">Current</div><div class="stat-value" id="s-curr">--<span class="stat-unit">A</span></div><div class="stat-sub">ACS712 sensor</div></div>
+      <div class="stat-card"><div class="stat-label">1h Energy</div><div class="stat-value" id="s-kwh">--<span class="stat-unit">kWh</span></div><div class="stat-sub" id="s-kwh-sub">--</div></div>
+      <div class="stat-card"><div class="stat-label">1h Avg Power</div><div class="stat-value" id="s-avg">--<span class="stat-unit">W</span></div><div class="stat-sub" id="s-avg-sub">--</div></div>
+      <div class="stat-card"><div class="stat-label">Peak (All Time)</div><div class="stat-value" id="s-peak">--<span class="stat-unit">W</span></div><div class="stat-sub">Max recorded</div></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Live Power Readings <span class="badge-blue badge" id="live-count">-- pts</span></div>
+        <div class="chart-sub">Last 50 readings from ESP32 — updates every 10s</div>
+        <div class="chart-wrap"><canvas id="live-chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Power Distribution</div>
+        <div class="chart-sub">High / Normal / Low breakdown</div>
+        <div class="chart-wrap"><canvas id="dist-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="anomaly-card">
+      <div class="anomaly-header">
+        <div class="anomaly-title">Anomaly / Spike Detection</div>
+        <div class="status-pill pill-ok" id="anomaly-pill">
+          <div class="pill-dot"></div>
+          <span id="anomaly-pill-text">All Normal</span>
+        </div>
+      </div>
+      <div id="anomaly-table-wrap">
+        <div class="empty-state"><div class="big">📡</div><p>Load data to detect anomalies</p></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ PAGE 3 — PREDICTION ══ -->
+<div class="page" id="page-predict">
+  <nav class="nav">
+    <div class="nav-brand"><span>⚡ EnergyIQ</span><div class="dot"></div></div>
+    <div class="nav-tabs">
+      <button class="nav-tab" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-tab active" onclick="showPage('predict')">Prediction</button>
+    </div>
+    <div class="nav-right">
+      <span class="nav-time" id="nav-clock-2">--:--:--</span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="page-content">
+    <div class="predict-header">
+      <h2>LSTM Power Forecast</h2>
+      <p>Predicts next 30 minutes of power consumption using your trained model</p>
+    </div>
+
+    <button class="btn-predict" id="predict-btn" onclick="loadPrediction()">
+      <span id="predict-btn-icon">▶</span> Run Prediction
+    </button>
+
+    <div class="predict-cards" id="predict-cards" style="display:none">
+      <div class="stat-card"><div class="stat-label">Avg Forecast</div><div class="stat-value" id="p-avg">--<span class="stat-unit">W</span></div><div class="stat-sub" id="p-avg-sub">Next 30 min</div></div>
+      <div class="stat-card"><div class="stat-label">Min Forecast</div><div class="stat-value" id="p-min">--<span class="stat-unit">W</span></div><div class="stat-sub">Lowest point</div></div>
+      <div class="stat-card"><div class="stat-label">Max Forecast</div><div class="stat-value" id="p-max">--<span class="stat-unit">W</span></div><div class="stat-sub">Peak point</div></div>
+      <div class="stat-card"><div class="stat-label">Energy</div><div class="stat-value" id="p-kwh">--<span class="stat-unit">kWh</span></div><div class="stat-sub">Forecast period</div></div>
+    </div>
+
+    <div class="forecast-card" id="forecast-chart-card" style="display:none">
+      <div class="forecast-title">
+        Power Forecast
+        <span class="badge-blue badge" id="forecast-badge">LSTM · -- min</span>
+      </div>
+      <div class="forecast-chart-wrap"><canvas id="forecast-chart"></canvas></div>
+    </div>
+
+    <div class="cost-grid" id="cost-grid" style="display:none">
+      <div class="cost-card">
+        <h4>Estimated Cost (Forecast Period)</h4>
+        <div class="cost-big" id="cost-forecast">₹ --</div>
+        <div class="cost-unit" id="cost-forecast-unit">for next -- minutes</div>
+      </div>
+      <div class="cost-card">
+        <h4>Projected Cost Per Hour</h4>
+        <div class="cost-big" id="cost-hour">₹ --</div>
+        <div class="cost-unit">at current consumption rate</div>
+      </div>
+    </div>
+
+    <div class="empty-state" id="predict-empty">
+      <div class="big">🧠</div>
+      <p>Press "Run Prediction" to fetch live Firebase data and forecast the next 30 minutes</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API         = 'https://callmerolex-energy-prediction.hf.space';
+const CREDS       = { user: 'admin', pass: 'energy123' };
+const INR_PER_KWH = 8;
+const REFRESH_SEC = 10;
+
+let liveChart, distChart, forecastChart;
+let autoInterval   = null;
+let countdownTimer = null;
+let countdown      = REFRESH_SEC;
+let autoOn         = false;
+
+// ── LOADING BAR ────────────────────────────────────────────────
+function setLoading(pct) {
+  const bar = document.getElementById('loading-bar');
+  bar.style.width = pct + '%';
+  if (pct >= 100) setTimeout(() => bar.style.width = '0%', 400);
+}
+
+// ── CLOCK ──────────────────────────────────────────────────────
+function updateClock() {
+  const t = new Date().toLocaleTimeString('en-IN');
+  ['nav-clock','nav-clock-2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t;
+  });
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ── AUTH ───────────────────────────────────────────────────────
+function doLogin() {
+  const u   = document.getElementById('login-user').value.trim();
+  const p   = document.getElementById('login-pass').value.trim();
+  const err = document.getElementById('login-error');
+  if (u === CREDS.user && p === CREDS.pass) {
+    err.style.display = 'none';
+    document.getElementById('page-login').classList.remove('active');
+    document.getElementById('page-dashboard').classList.add('active');
+    startAutoRefresh();
+  } else {
+    err.style.display = 'block';
+    err.textContent = 'Invalid credentials. Use admin / energy123';
+  }
+}
+
+function doLogout() {
+  stopAutoRefresh();
+  ['page-dashboard','page-predict'].forEach(id =>
+    document.getElementById(id).classList.remove('active'));
+  document.getElementById('page-login').classList.add('active');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' &&
+      document.getElementById('page-login').classList.contains('active')) doLogin();
+});
+
+// ── PAGE NAV ───────────────────────────────────────────────────
+function showPage(name) {
+  ['dashboard','predict'].forEach(p =>
+    document.getElementById('page-' + p).classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+// ── AUTO REFRESH ───────────────────────────────────────────────
+function startAutoRefresh() {
+  autoOn = true;
+  updateAutoBtn();
+  loadDashboard();
+  startCountdown();
+  autoInterval = setInterval(() => {
+    loadDashboard();
+    resetCountdown();
+  }, REFRESH_SEC * 1000);
+}
+
+function stopAutoRefresh() {
+  autoOn = false;
+  updateAutoBtn();
+  if (autoInterval)   { clearInterval(autoInterval);   autoInterval   = null; }
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  document.getElementById('countdown-wrap').style.display = 'none';
+}
+
+function toggleAutoRefresh() {
+  autoOn ? stopAutoRefresh() : startAutoRefresh();
+}
+
+function updateAutoBtn() {
+  const btn   = document.getElementById('auto-btn');
+  const dot   = document.getElementById('auto-dot');
+  const label = document.getElementById('auto-label');
+  const wrap  = document.getElementById('countdown-wrap');
+  if (autoOn) {
+    btn.className     = 'auto-toggle on';
+    dot.className     = 'auto-dot blinking';
+    label.textContent = 'Auto-refresh: ON';
+    wrap.style.display = 'flex';
+  } else {
+    btn.className     = 'auto-toggle off';
+    dot.className     = 'auto-dot';
+    label.textContent = 'Auto-refresh: OFF';
+    wrap.style.display = 'none';
+  }
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────────
+const CIRCUMFERENCE = 69.1;
+
+function startCountdown() {
+  countdown = REFRESH_SEC;
+  updateCountdownUI();
+  countdownTimer = setInterval(() => {
+    countdown--;
+    if (countdown < 0) countdown = REFRESH_SEC;
+    updateCountdownUI();
+  }, 1000);
+}
+
+function resetCountdown() {
+  countdown = REFRESH_SEC;
+  updateCountdownUI();
+}
+
+function updateCountdownUI() {
+  const fill = document.getElementById('ring-fill');
+  const num  = document.getElementById('countdown-num');
+  if (!fill) return;
+  fill.style.strokeDashoffset = CIRCUMFERENCE * (1 - countdown / REFRESH_SEC);
+  num.textContent = countdown + 's';
+}
+
+// ── DASHBOARD LOAD ─────────────────────────────────────────────
+async function loadDashboard() {
+  const status = document.getElementById('dash-status');
+  status.textContent = '⟳ Fetching live data...';
+  setLoading(20);
+  try {
+    const [statsRes, histRes, anomRes] = await Promise.all([
+      fetch(`${API}/stats`),
+      fetch(`${API}/history?limit=50`),
+      fetch(`${API}/anomaly?limit=100`)
+    ]);
+    setLoading(70);
+    const stats = await statsRes.json();
+    const hist  = await histRes.json();
+    const anom  = await anomRes.json();
+    renderStats(stats);
+    renderLiveChart(hist);
+    renderDistChart(hist);
+    renderAnomalies(anom);
+    setLoading(100);
+    const now = new Date().toLocaleTimeString('en-IN');
+    status.textContent = autoOn
+      ? `✅ Live · auto-refreshing every ${REFRESH_SEC}s · last: ${now}`
+      : `✅ Updated at ${now}`;
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+    setLoading(100);
+  }
+}
+
+// ── RENDER STATS ───────────────────────────────────────────────
+function renderStats(d) {
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.innerHTML = val; };
+  const watts = d.current_watts || 0;
+  set('s-power', `${watts}<span class="stat-unit">W</span>`);
+  set('s-power-sub', `<span class="stat-badge ${watts > 1000 ? 'badge-red' : watts > 500 ? 'badge-amber' : 'badge-green'}">${watts > 1000 ? 'High' : watts > 500 ? 'Normal' : 'Low'}</span>`);
+  set('s-volt', `${d.current_voltage || '--'}<span class="stat-unit">V</span>`);
+  set('s-curr', `${d.current_current_a || '--'}<span class="stat-unit">A</span>`);
+  const h1 = d.last_1h || {};
+  set('s-kwh', `${h1.kwh || '--'}<span class="stat-unit">kWh</span>`);
+  set('s-kwh-sub', `₹${((h1.kwh||0)*INR_PER_KWH).toFixed(3)} estimated`);
+  set('s-avg', `${h1.avg_watts || '--'}<span class="stat-unit">W</span>`);
+  set('s-avg-sub', `${h1.readings || 0} readings`);
+  const at = d.all_time || {};
+  set('s-peak', `${at.max_watts || '--'}<span class="stat-unit">W</span>`);
+}
+
+// ── LIVE CHART — smooth update, no flicker ─────────────────────
+function renderLiveChart(d) {
+  const readings = d.readings || [];
+  document.getElementById('live-count').textContent = readings.length + ' pts';
+
+  // use reading index as label — timestamps are unreliable (1970 issue)
+  const labels = readings.map((r, i) => i % 10 === 0 ? `#${i + 1}` : '');
+  const data   = readings.map(r => r.power_watts);
+
+  if (liveChart) {
+    // ✅ update in-place — no destroy, no flicker
+    liveChart.data.labels           = labels;
+    liveChart.data.datasets[0].data = data;
+    liveChart.update('none');        // 'none' skips animation for instant update
+    return;
+  }
+
+  // first load — create chart
+  const ctx  = document.getElementById('live-chart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 220);
+  grad.addColorStop(0, 'rgba(0,229,255,0.25)');
+  grad.addColorStop(1, 'rgba(0,229,255,0)');
+
+  liveChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{
+      data,
+      borderColor: '#00e5ff',
+      backgroundColor: grad,
+      borderWidth: 2,
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.parsed.y.toFixed(1)} W` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { callback: v => v + 'W' }
+        }
+      }
+    }
+  });
+}
+
+// ── DIST CHART — smooth update ─────────────────────────────────
+function renderDistChart(d) {
+  const watts  = (d.readings || []).map(r => r.power_watts);
+  const high   = watts.filter(w => w > 800).length;
+  const normal = watts.filter(w => w >= 200 && w <= 800).length;
+  const low    = watts.filter(w => w < 200).length;
+
+  if (distChart) {
+    // ✅ update in-place
+    distChart.data.datasets[0].data = [high, normal, low];
+    distChart.update('none');
+    return;
+  }
+
+  const ctx = document.getElementById('dist-chart').getContext('2d');
+  distChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['High (>800W)', 'Normal', 'Low (<200W)'],
+      datasets: [{
+        data: [high, normal, low],
+        backgroundColor: ['rgba(239,68,68,0.8)', 'rgba(0,229,255,0.8)', 'rgba(16,185,129,0.8)'],
+        borderColor: '#141c2e', borderWidth: 3, hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed} readings` } }
+      },
+      cutout: '65%'
+    }
+  });
+}
+
+// ── ANOMALY TABLE ──────────────────────────────────────────────
+function renderAnomalies(d) {
+  const pill     = document.getElementById('anomaly-pill');
+  const pillText = document.getElementById('anomaly-pill-text');
+  const wrap     = document.getElementById('anomaly-table-wrap');
+  const anom     = d.anomalies || [];
+
+  if (d.status === 'anomaly_detected') {
+    pill.className    = 'status-pill pill-alert';
+    pillText.textContent = `${anom.length} Spike${anom.length > 1 ? 's' : ''} Detected`;
+  } else {
+    pill.className    = 'status-pill pill-ok';
+    pillText.textContent = 'All Normal';
+  }
+
+  if (!anom.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="big">✅</div><p>No anomalies in last 100 readings. Baseline: ${d.baseline_avg_w}W ± ${d.baseline_std_w}W</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Timestamp</th><th>Power (W)</th><th>Z-Score</th><th>Type</th></tr></thead>
+      <tbody>${anom.map((a, i) => `
+        <tr>
+          <td class="td-mono" style="color:var(--muted)">${i + 1}</td>
+          <td class="td-mono">${a.timestamp}</td>
+          <td class="td-mono" style="color:${a.type === 'high_spike' ? 'var(--red)' : 'var(--amber)'}">${a.power_watts}</td>
+          <td class="td-mono">${a.z_score > 0 ? '+' : ''}${a.z_score}</td>
+          <td><span class="stat-badge ${a.type === 'high_spike' ? 'badge-red' : 'badge-amber'}">${a.type === 'high_spike' ? '▲ High spike' : '▼ Low drop'}</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:14px;font-size:12px;color:var(--muted)">
+      Baseline: ${d.baseline_avg_w}W avg · ${d.baseline_std_w}W std · Threshold: ±${d.threshold_zscore}σ
+    </div>`;
+}
+
+// ── PREDICTION ─────────────────────────────────────────────────
+async function loadPrediction() {
+  const btn   = document.getElementById('predict-btn');
+  const icon  = document.getElementById('predict-btn-icon');
+  const empty = document.getElementById('predict-empty');
+
+  btn.disabled   = true;
+  icon.className = 'spinning'; icon.textContent = '⟳';
+  setLoading(20);
+
+  try {
+    const res  = await fetch(`${API}/fetch-and-predict`);
+    const data = await res.json();
+    setLoading(100);
+
+    if (!res.ok) { alert('Error: ' + (data.error || 'Unknown')); return; }
+
+    const s     = data.summary || {};
+    const preds = data.predictions_watts || [];
+    const mins  = data.forecast_minutes || 8;
+
+    document.getElementById('predict-cards').style.display = 'grid';
+    document.getElementById('p-avg').innerHTML      = `${s.avg_watts}<span class="stat-unit">W</span>`;
+    document.getElementById('p-avg-sub').textContent = `Next ${mins} min`;
+    document.getElementById('p-min').innerHTML      = `${s.min_watts}<span class="stat-unit">W</span>`;
+    document.getElementById('p-max').innerHTML      = `${s.max_watts}<span class="stat-unit">W</span>`;
+    document.getElementById('p-kwh').innerHTML      = `${s.total_kwh}<span class="stat-unit">kWh</span>`;
+
+    document.getElementById('forecast-chart-card').style.display = 'block';
+    document.getElementById('forecast-badge').textContent = `LSTM · ${mins} min`;
+
+    const timeLabels = preds.map((_, i) => {
+      const secs = i * 8;
+      const m    = Math.floor(secs / 60).toString().padStart(2, '0');
+      const s2   = (secs % 60).toString().padStart(2, '0');
+      return `+${m}:${s2}`;
+    });
+
+    if (forecastChart) {
+      forecastChart.data.labels              = timeLabels;
+      forecastChart.data.datasets[0].data    = preds;
+      forecastChart.data.datasets[1].data    = Array(preds.length).fill(s.avg_watts);
+      forecastChart.data.datasets[1].label   = `Avg (${s.avg_watts}W)`;
+      forecastChart.update('none');
+    } else {
+      const ctx  = document.getElementById('forecast-chart').getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 300);
+      grad.addColorStop(0, 'rgba(124,58,237,0.35)');
+      grad.addColorStop(1, 'rgba(124,58,237,0)');
+
+      forecastChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timeLabels,
+          datasets: [
+            {
+              label: 'Predicted Power',
+              data: preds,
+              borderColor: '#7c3aed', backgroundColor: grad,
+              borderWidth: 2.5, fill: true, tension: 0.4,
+              pointRadius: 2, pointBackgroundColor: '#7c3aed', pointHoverRadius: 5
+            },
+            {
+              label: `Avg (${s.avg_watts}W)`,
+              data: Array(preds.length).fill(s.avg_watts),
+              borderColor: 'rgba(0,229,255,0.4)', borderDash: [6, 4],
+              borderWidth: 1.5, pointRadius: 0, fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, labels: { padding: 20 } },
+            tooltip: { callbacks: { label: c => ` ${c.parsed.y.toFixed(1)} W` } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 12, maxRotation: 0 } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v + 'W' } }
+          }
+        }
+      });
+    }
+
+    document.getElementById('cost-grid').style.display       = 'grid';
+    document.getElementById('cost-forecast').textContent      = '₹ ' + (s.total_kwh * INR_PER_KWH).toFixed(4);
+    document.getElementById('cost-forecast-unit').textContent = `for next ${mins} minutes`;
+    document.getElementById('cost-hour').textContent          = '₹ ' + ((s.avg_watts / 1000) * INR_PER_KWH).toFixed(3);
+
+    empty.style.display = 'none';
+
+  } catch(e) {
+    alert('Network error: ' + e.message);
+    setLoading(100);
+  } finally {
+    btn.disabled   = false;
+    icon.className = ''; icon.textContent = '▶';
+  }
+}
+</script>
+</body>
+</html>

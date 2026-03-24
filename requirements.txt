@@ -1,0 +1,8 @@
+flask
+flask-cors
+firebase-admin
+tensorflow
+numpy
+pandas
+scikit-learn
+gunicorn
