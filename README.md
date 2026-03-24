@@ -244,7 +244,7 @@ Login: `admin` / `energy123`
 
 ## 👨‍💻 Author
 
-**Imran** — Final Year B.E. Project, 2026
+**Thoufeeq**
 
 - 🔗 Live Demo: [https://callmerolex-energy-prediction.hf.space/ui](https://callmerolex-energy-prediction.hf.space/ui)
 - 🤗 HF Space: [https://huggingface.co/spaces/CallMeRolex/Energy-Prediction](https://huggingface.co/spaces/CallMeRolex/Energy-Prediction)
